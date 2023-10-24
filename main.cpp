@@ -10,7 +10,7 @@
 using namespace std;
 
 const int MAX_RESULT_DOCUMENT_COUNT = 5;
-const int EPSILON = 1e-6;
+const double EPSILON = 1e-6;
 
 string ReadLine() {
     string s;
@@ -322,16 +322,85 @@ void PrintDocument(const Document& document) {
          << "rating = "s << document.rating << " }"s << endl;
 }
 
+template <typename Iterator>
+class IteratorRange {
+public:
+    IteratorRange(Iterator begin, Iterator end) {
+        begin_ = begin;
+        end_ = end;
+    }
+
+    Iterator begin() {
+        return begin_;
+    }
+
+    Iterator end() {
+        return end_;
+    }
+private:
+    Iterator begin_;
+    Iterator end_;
+};
+
+template <typename Iterator>
+class Paginator {
+public:
+    Paginator(Iterator begin, Iterator end, int size) {
+        while (begin + size < end) {
+            paginator_.push_back(IteratorRange(begin, begin + size));
+            begin += size;
+        }
+        if (begin < end) {
+            paginator_.push_back(IteratorRange(begin, end));
+        }
+    }
+
+    auto begin() const {
+        return paginator_.begin();
+    }
+
+    auto end() const {
+        return paginator_.end();
+    }
+
+private:
+    vector<IteratorRange<Iterator>> paginator_;
+};
+
+template <typename Iterator>
+ostream& operator<<(ostream& o, IteratorRange<Iterator> page) {
+    for(auto it = page.begin(); it < page.end(); it++) {
+        o << *it << endl;
+    }
+    return o;
+}
+
+ostream& operator<<(ostream& o, Document document) {
+    o << "{ "s
+      << "document_id = "s << document.id << ", "s
+      << "relevance = "s << document.relevance << ", "s
+      << "rating = "s << document.rating << " }"s << endl;
+    return o;
+}
+
+template <typename Container>
+auto Paginate(const Container& c, size_t page_size) {
+    return Paginator(begin(c), end(c), page_size);
+}
+
 int main() {
-    SearchServer search_server("и в на"s);
-
-    search_server.AddDocument(1, "пушистый кот пушистый хвост"s, DocumentStatus::ACTUAL, {7, 2, 7});
-//    search_server.AddDocument(1, "пушистый пёс и модный ошейник"s, DocumentStatus::ACTUAL, {1, 2});
-//    search_server.AddDocument(-1, "пушистый пёс и модный ошейник"s, DocumentStatus::ACTUAL, {1, 2});
-//    search_server.AddDocument(3, "большой пёс скво\x12рец"s, DocumentStatus::ACTUAL, {1, 3, 2});
-
-    vector<Document> documents = search_server.FindTopDocuments("пушистый"s);
-    for (const Document& document : documents) {
-        PrintDocument(document);
+    SearchServer search_server("and with"s);
+    search_server.AddDocument(1, "funny pet and nasty rat"s, DocumentStatus::ACTUAL, {7, 2, 7});
+    search_server.AddDocument(2, "funny pet with curly hair"s, DocumentStatus::ACTUAL, {1, 2, 3});
+    search_server.AddDocument(3, "big cat nasty hair"s, DocumentStatus::ACTUAL, {1, 2, 8});
+    search_server.AddDocument(4, "big dog cat Vladislav"s, DocumentStatus::ACTUAL, {1, 3, 2});
+    search_server.AddDocument(5, "big dog hamster Borya"s, DocumentStatus::ACTUAL, {1, 1, 1});
+    const auto search_results = search_server.FindTopDocuments("curly dog"s);
+    int page_size = 2;
+    const auto pages = Paginate(search_results, page_size);
+    // Выводим найденные документы по страницам
+    for (auto page = pages.begin(); page != pages.end(); ++page) {
+        cout << *page << endl;
+        cout << "Page break"s << endl;
     }
 }
